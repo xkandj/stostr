@@ -1,0 +1,9 @@
+nohup: ignoring input
+Traceback (most recent call last):
+  File "C:\Software\01-Installers\miniconda3\lib\runpy.py", line 183, in _run_module_as_main
+    mod_name, mod_spec, code = _get_module_details(mod_name, _Error)
+  File "C:\Software\01-Installers\miniconda3\lib\runpy.py", line 109, in _get_module_details
+    __import__(pkg_name)
+  File "D:\02-Workspace\02-elc\ssaa\sto\stock_scheduler.py", line 9, in <module>
+    import jqdatasdk as jq
+ModuleNotFoundError: No module named 'jqdatasdk'

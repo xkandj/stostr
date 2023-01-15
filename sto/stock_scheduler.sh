@@ -1,0 +1,1 @@
+nohup python -m stock_scheduler.py > stock_scheduler.log  2>&1 &
