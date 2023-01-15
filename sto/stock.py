@@ -158,8 +158,8 @@ class Record:
         self.sell_time = sell_time
         self.sell_price = sell_price
         self.sell_share = sell_share
-        self.finish = finish,
-        self.profit_share = profit_share,
+        self.finish = finish
+        self.profit_share = profit_share
         self.profit = profit
 
     @classmethod
@@ -194,13 +194,12 @@ class Stock:
 
     def __init__(self,
                  code,
-                 records,
-                 position,
-                 available) -> None:
+                 records) -> None:
         self.code = code
         self.records = records
-        self.position = position
-        self.available = available
+        self.max_record_round = None
+        self.position = None
+        self.available = None
 
     def _get_buy_interval(self):
         # 获取每次买的间隔，由历史数据确定，应该分为几档
@@ -220,9 +219,80 @@ class Stock:
     @ classmethod
     def obj_hook(cls, obj_dict):
         return cls(obj_dict.get("code"),
-                   [Record.obj_hook(r) for r in obj_dict.get("records")],
-                   obj_dict.get("position"),
-                   obj_dict.get("available"))
+                   [Record.obj_hook(r) for r in obj_dict.get("records")])
+
+    def init_data(self):
+        consume = 0
+        position = 0
+        max_record_round = 0
+        for record in self.records:
+            if record.finish == 1:
+                position += record.profit_share
+            else:
+                position += record.buy_share
+                consume += eval(record.buy_money)
+            max_record_round = max(max_record_round, record.rounds)
+        self.max_record_round = max_record_round
+        self.position = position
+        self.available = self.position
+        return consume
+
+    def update_position(self):
+        ...
+
+    def update_available(self):
+        self.available = self.position
+
+    def fit(self, df, principal):
+        ...
+        # self.xx=1 通过历史数据得到某些值
+        # 比如买的阈值，卖的份额
+
+    def buy(self, principal, price):
+        # 没有记录也买
+        for record in self.records:
+            if record.finish == 0:
+                consume += eval(record.buy_money)
+
+        buy_shares = (self.total_shares / self.buy_shares_coeff + 1) * self.buy_shares_coeff
+        curr_volume = buy_shares * price
+        total_volume = self.total_consume + curr_volume + self._compute_commission(curr_volume)
+        if self.buy_threshold >= price and self.principal >= total_volume:
+            self.total_consume = total_volume
+            self.total_shares += buy_shares
+            self._compute_buy_thre(is_buy=True)
+
+            print(f"buy...")
+            print(
+                f"buy_threshold, {self.buy_threshold}, price, {price}, total_consume, {self.total_consume}，total_shares, {self.total_shares}")
+
+            return buy_shares
+        return 0
+
+        if trade_type == "buy":
+            # df_current = pd.DataFrame({
+            #     "round=round"),
+            #     "buy_time=buy_time"),
+            #     "buy_price=buy_price"),
+            #     "buy_share=buy_share"),
+            #     "buy_money=buy_money"),
+            #     "buy_money_cumsum=buy_money_cumsum"),
+            #     "buy_next=buy_next"),
+            #     "sell=sell"),
+            #     "sell_time": "",
+            #     "sell_price": "",
+            #     "sell_share": "",
+            #     "finish": 0,
+            #     "profit_share": 0,
+            #     "profit": 0
+            # })
+            if df_record.empty == False:
+                condition = df_record["round"] == v.get("round")
+                df_record.loc[condition, ["buy_next", "sell"]] = ""
+                # df_record = pd.concat([df_record, df_current], axis=0)
+
+    def sell(self, principal, a):
+        ...
 
 
 class Corpus:
@@ -480,40 +550,60 @@ class StockStrategy2:
 
     def run(self,
             test_start_date: str) -> None:
+        principal = self.principal
         # record_dict = Tool.filter_record_dict(self.record_dict)
-        df_train_all = self.df.loc[self.df.index < test_start_date, :]
-        df_test_all = self.df.loc[self.df.index >= test_start_date, :]
-        if df_test_all.empty:
+        df_train = self.df.loc[self.df.index < test_start_date, :]
+        df_test = self.df.loc[self.df.index >= test_start_date, :]
+        if df_test.empty:
             raise ValueError(f"测试数据时间段：{self.df.index[0]}--{self.df.index[-1]}。给定时间{test_start_date}无法验证策略")
+
+        # 数据准备
+        stock_dict = {}
         for k, v in self.record_dict.items():
             code = k.split(",")[1]
-            if df_train_all.empty == False:
-                df_train = df_train_all.loc[df_train_all["code"] == code, :]
-                # 利用训练数据得到某些阈值
-            df_test = df_test_all.loc[df_test_all["code"] == code, :]
-            if df_test.empty:
-                continue
+            stock = Stock.obj_hook({"code": code, "records": v.to_dict("records")})
+            principal -= stock.init_data()
+            stock_dict[code] = {"name": k, "stock": stock}
+        if principal < 0:
+            raise ValueError(f"当前本金已经小于0，{principal}")
 
-            # obj_dict.get("profit"),
-            #        obj_dict.get("profit_share"),
-            #        obj_dict.get("sell_share_price"),
-            #        obj_dict.get("records"),
-            #        obj_dict.get("position"),
-            #        obj_dict.get("available")
-            stock = Stock.obj_hook({"code": code, "records": v})
+        # 数据训练
+        for v in stock_dict.values():
+            stock = v.get("stock")
+            if df_train.empty == False:
+                df_train = df_train.loc[df_train["code"] == v.get("code"), :]
+                stock.fit(df_train, principal/len(stock_dict))
 
-            for date_str in df_test.index:
-                print(type(date_str))
+        # 数据验证
+        for date_str in df_test.index:
+            for k, v in stock_dict.items():
+                condition = (df_test.index == date_str) & (df_test["code"] == k)
+                df = df_test.loc[condition, ["code", "high", "low"]]
+                if df.empty:
+                    print(f"无此{k}的相关记录")
+                    continue
+                stock = v.get("stock")
+
+                price = df["low"].values[0]
+                principal = stock.buy(principal, price)
+                price = df["high"].values[0]
+                principal = stock.sell(principal, price)
+
+                # stock.update_position()  # 此处都需要减去
+
+                hour = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").hour
+                if hour == 15:
+                    stock.update_available()
         # self._update_record()
 
         # 更新record
-        Corpus("excel", self.record_file_path).save_data(record_dict)
+        # Corpus("excel", self.record_file_path).save_data(record_dict)
 
 
 if __name__ == "__main__":
     stock_list = ["588000", "513050"]
     test_start_date = "2022-01-02"
-    StockStrategy2(principal=1).run(test_start_date)
+    StockStrategy2(principal=10000*10).run(test_start_date)
     # for stock in stock_list:
     #     file_path = path.join(path.dirname(__file__), f"{stock}_202201_202301.csv")
     #     df = pd.read_csv(file_path, index_col=[0])

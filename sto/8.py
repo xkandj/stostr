@@ -1,8 +1,19 @@
+import datetime
 import time
 import timeit
 
 import pandas as pd
 
+stock_dict = {}
+stock = stock_dict.get("code").get("stock")
+exit()
+df = pd.DataFrame({"x": [2, 2, 3], "x1": [1, 2, 3], "x2": [1, 2, 3]})
+print(df)
+x = df.loc[df["x"] == 3, ["x1", "x2"]][0]
+print(x)
+# x = datetime.datetime.strptime("2022-01-01 09:00:00").hour
+# print(x.hour)
+exit()
 dict_ = {}
 x = dict_.get('targetColumn') if 'targetColumn' in dict_ else None
 print(x is None)
