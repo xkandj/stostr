@@ -131,9 +131,39 @@ class StockStrategy:
             print(f"day_buy_shares, {day_buy_shares}")
 
 
+class Strategy:
+    def __init__(self, df, stock_num) -> None:
+        self.df = df
+        self.stock_num = stock_num
+
+    def buy(self, principal, price, records):
+        share_list = []
+        return share_list
+
+    def sell(self, price, records):
+        round_list = []
+        return round_list
+
+    # def _get_buy_interval(self):
+    #     # 获取每次买的间隔，由历史数据确定，应该分为几档
+    #     # 用昨天的数据确定买的间隔
+    #     return 0.05
+
+    # def _get_buy_baseshare(self):
+    #     # 获取买入的基准份额
+    #     # 由本金和历史数据确定
+    #     return 1E4
+
+    # def get_buy_info(self):
+    #     threshold = 0  # curr_threshold - self._get_buy_interval
+    #     share = 0  # curr_share * 2, self._get_buy_baseshare
+    #     return (threshold, share)
+
+
 class Record:
     def __init__(self,
                  rounds,
+                 latest_round,
                  buy_time,
                  buy_price,
                  buy_share,
@@ -148,6 +178,7 @@ class Record:
                  profit_share,
                  profit) -> None:
         self.rounds = rounds
+        self.latest_round = latest_round
         self.buy_time = buy_time
         self.buy_price = buy_price
         self.buy_share = buy_share
@@ -165,6 +196,7 @@ class Record:
     @classmethod
     def obj_hook(cls, obj_dict):
         return cls(obj_dict.get("rounds"),
+                   obj_dict.get("latest_round"),
                    obj_dict.get("buy_time"),
                    obj_dict.get("buy_price"),
                    obj_dict.get("buy_share"),
@@ -197,32 +229,16 @@ class Stock:
                  records) -> None:
         self.code = code
         self.records = records
-        self.max_record_round = None
         self.position = None
         self.available = None
-
-    def _get_buy_interval(self):
-        # 获取每次买的间隔，由历史数据确定，应该分为几档
-        # 用昨天的数据确定买的间隔
-        return 0.05
-
-    def _get_buy_baseshare(self):
-        # 获取买入的基准份额
-        # 由本金和历史数据确定
-        return 1E4
-
-    def get_buy_info(self):
-        threshold = 0  # curr_threshold - self._get_buy_interval
-        share = 0  # curr_share * 2, self._get_buy_baseshare
-        return (threshold, share)
+        self.strategy = None
 
     @ classmethod
     def obj_hook(cls, obj_dict):
         return cls(obj_dict.get("code"),
                    [Record.obj_hook(r) for r in obj_dict.get("records")])
 
-    def init_data(self):
-        consume = 0
+    def init_data(self, df, stock_num):
         position = 0
         max_record_round = 0
         for record in self.records:
@@ -230,12 +246,11 @@ class Stock:
                 position += record.profit_share
             else:
                 position += record.buy_share
-                consume += eval(record.buy_money)
             max_record_round = max(max_record_round, record.rounds)
         self.max_record_round = max_record_round
         self.position = position
         self.available = self.position
-        return consume
+        self.strategy = Strategy(df, stock_num)
 
     def update_position(self):
         ...
@@ -243,12 +258,9 @@ class Stock:
     def update_available(self):
         self.available = self.position
 
-    def fit(self, df, principal):
-        ...
-        # self.xx=1 通过历史数据得到某些值
-        # 比如买的阈值，卖的份额
+    def buy(self, principal, dt, price):
+        share_list = self.strategy.buy(principal, price, self.records)
 
-    def buy(self, principal, price):
         # 没有记录也买
         for record in self.records:
             if record.finish == 0:
@@ -265,9 +277,9 @@ class Stock:
             print(f"buy...")
             print(
                 f"buy_threshold, {self.buy_threshold}, price, {price}, total_consume, {self.total_consume}，total_shares, {self.total_shares}")
-
-            return buy_shares
-        return 0
+        # 注意修改self.records
+        use_principal = 0
+        return use_principal
 
         if trade_type == "buy":
             # df_current = pd.DataFrame({
@@ -291,8 +303,18 @@ class Stock:
                 df_record.loc[condition, ["buy_next", "sell"]] = ""
                 # df_record = pd.concat([df_record, df_current], axis=0)
 
-    def sell(self, principal, a):
-        ...
+    def sell(self, dt, price):
+        sell_list = self.strategy.sell(price, self.records)
+        back_principal = 0
+        for sell_ in sell_list:
+            rounds = sell_.get("rounds")
+            sell_share = sell_.get("sell_share")
+            for record in self.records:
+                if rounds == record.rounds:
+                    if record.latest_round == 1:
+                        back_principal += record.buy_money_cumsum
+
+        return back_principal
 
 
 class Corpus:
@@ -422,10 +444,8 @@ class Tool:
             df_record.sort_values(["round", "buy_time"], inplace=True)
 
 
-class StockStrategy2:
-    def __init__(self, principal) -> None:
-        self.principal = principal
-
+class TestMain:
+    def __init__(self) -> None:
         self.record_file_path = path.join(path.dirname(__file__), "record.xlsx")
         self.record_dict = self._load_data("excel", self.record_file_path)
         self.df = self._load_data("csv", path.join(path.dirname(__file__), "history.csv"))
@@ -548,31 +568,25 @@ class StockStrategy2:
             day_buy_shares += self._buy(low_price)
             print(f"day_buy_shares, {day_buy_shares}")
 
-    def run(self,
-            test_start_date: str) -> None:
-        principal = self.principal
+    def test(self,
+             principal: float,
+             start_date: str) -> None:
         # record_dict = Tool.filter_record_dict(self.record_dict)
-        df_train = self.df.loc[self.df.index < test_start_date, :]
-        df_test = self.df.loc[self.df.index >= test_start_date, :]
+        df_train = self.df.loc[self.df.index < start_date, :]
+        df_test = self.df.loc[self.df.index >= start_date, :]
         if df_test.empty:
-            raise ValueError(f"测试数据时间段：{self.df.index[0]}--{self.df.index[-1]}。给定时间{test_start_date}无法验证策略")
+            raise ValueError(f"测试数据时间段：{self.df.index[0]}--{self.df.index[-1]}。给定时间{start_date}无法验证策略")
 
-        # 数据准备
+        # 数据处理
         stock_dict = {}
         for k, v in self.record_dict.items():
             code = k.split(",")[1]
             stock = Stock.obj_hook({"code": code, "records": v.to_dict("records")})
-            principal -= stock.init_data()
-            stock_dict[code] = {"name": k, "stock": stock}
-        if principal < 0:
-            raise ValueError(f"当前本金已经小于0，{principal}")
-
-        # 数据训练
-        for v in stock_dict.values():
-            stock = v.get("stock")
+            df = pd.DataFrame()
             if df_train.empty == False:
-                df_train = df_train.loc[df_train["code"] == v.get("code"), :]
-                stock.fit(df_train, principal/len(stock_dict))
+                df = df_train.loc[df_train["code"] == code, :]
+            stock.init_data(df, len(stock_dict))
+            stock_dict[code] = {"name": k, "stock": stock}
 
         # 数据验证
         for date_str in df_test.index:
@@ -585,9 +599,9 @@ class StockStrategy2:
                 stock = v.get("stock")
 
                 price = df["low"].values[0]
-                principal = stock.buy(principal, price)
+                principal -= stock.buy(principal, date_str, price)
                 price = df["high"].values[0]
-                principal = stock.sell(principal, price)
+                principal += stock.sell(date_str, price)
 
                 # stock.update_position()  # 此处都需要减去
 
@@ -601,17 +615,4 @@ class StockStrategy2:
 
 
 if __name__ == "__main__":
-    stock_list = ["588000", "513050"]
-    test_start_date = "2022-01-02"
-    StockStrategy2(principal=10000*10).run(test_start_date)
-    # for stock in stock_list:
-    #     file_path = path.join(path.dirname(__file__), f"{stock}_202201_202301.csv")
-    #     df = pd.read_csv(file_path, index_col=[0])
-    #     df = df.loc["2022-01-04":"2022-01-05""), :]
-
-    #     principal = 10000 * 5*2
-    #     strategy = StockStrategy(principal)
-    #     strategy.validate(df)
-    #     print(f"时间段：{df.index[0]}——>{df.index[-1]}，本金：{principal}，盈利份额：{strategy.profit_share}，盈利值：{strategy.profit}")
-
-    #     break
+    TestMain().test(principal=10000*10, start_date="2022-01-02")
