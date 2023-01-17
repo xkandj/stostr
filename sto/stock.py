@@ -259,8 +259,9 @@ class Stock:
         self.available = self.position
 
     def buy(self, principal, dt, price):
-        share_list = self.strategy.buy(principal, price, self.records)
-
+        buy_dict = self.strategy.buy(principal, price, self.records)
+        buy_dict.get("exist_list")
+        fresh_dict = buy_dict.get("fresh_dict")
         # 没有记录也买
         for record in self.records:
             if record.finish == 0:
@@ -308,10 +309,10 @@ class Stock:
              price: float) -> float:
         back_principal = 0
         sell_dict = self.strategy.sell(price, self.records)
-        # 卖出回本的份额
-        for record_ in sell_dict.get("record_list"):
+        # 存在的
+        for exist_ in sell_dict.get("exist_list"):
             for record in self.records:
-                if record.rounds == record_.get("rounds", -1):
+                if record.rounds == exist_.get("rounds", -1):
                     record.buy_next = ""
                     record.sell = ""
                     # record.sell_time = ""
@@ -323,17 +324,17 @@ class Stock:
                     if record.latest_round == 1:
                         record.sell_time = dt
                         record.sell_price = price
-                        record.sell_share = record_.get("sell_share", 0)
-                        record.profit_share = record_.get("profit_share", 0)
-                        record.profit = record_.get("profit", 0)
+                        record.sell_share = exist_.get("sell_share", 0)
+                        record.profit_share = exist_.get("profit_share", 0)
+                        record.profit = exist_.get("profit", 0)
                         back_principal += record.buy_money_cumsum
-        # 卖出盈利的份额
-        more_dict = sell_dict.get("more_dict")
-        if more_dict:
+        # 新鲜的
+        fresh_dict = sell_dict.get("fresh_dict")
+        if fresh_dict:
             for record in self.records:
                 record.profit_share = 0
             self.records.append(
-                Record.obj_hook({"rounds": more_dict.get("rounds"),
+                Record.obj_hook({"rounds": fresh_dict.get("rounds"),
                                  "latest_round": 1,
                                  "buy_time": "",
                                  "buy_price": "",
@@ -344,11 +345,11 @@ class Stock:
                                  "sell": "",
                                  "sell_time": dt,
                                  "sell_price": price,
-                                 "sell_share": more_dict.get("sell_share"),
+                                 "sell_share": fresh_dict.get("sell_share"),
                                  "finish": 1,
                                  "profit_share": 0,
-                                 "profit": more_dict.get("profit")}))
-            back_principal += more_dict.get("profit")
+                                 "profit": fresh_dict.get("profit")}))
+            back_principal += fresh_dict.get("profit")
         return back_principal
 
 
