@@ -4,6 +4,14 @@ import timeit
 
 import pandas as pd
 
+a = None
+if a:
+    print(11)
+lst = [1, 2, 3, 4, 1]
+se = set(lst)
+print(se)
+print(2 in se)
+exit()
 stock_dict = {}
 stock = stock_dict.get("code").get("stock")
 exit()
