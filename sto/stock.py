@@ -137,15 +137,15 @@ class Strategy:
         self.stock_num = stock_num
 
     def buy(self, principal, price, records):
-        # remain_principal = principal
-        lst = []
+        remain_principal = principal
+        exec_round_list = []
         for record in records:
             if record.finish == 0:
-                lst.append(record.rounds)
-                principal -= eval(record.buy_money)
-        length = len(set(lst))  # 次数超过多少不再买？
+                exec_round_list.append(record.rounds)
+                remain_principal -= eval(record.buy_money)
+        length = len(set(exec_round_list))  # 次数超过多少不再买？
         # 不买
-        if principal < x:
+        if remain_principal < 0 or remain_principal < 0.3*principal or len(set(exec_round_list)) > 5:
             return []
 
         # 买
