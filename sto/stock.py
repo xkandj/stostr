@@ -137,131 +137,17 @@ class Strategy:
         self.stock_num = stock_num
 
     def buy(self, principal, price, records):
-        share_list = []
-        return share_list
+        round_dict={"rounds": buy_dict.get("rounds", -1),
+                                                 "buy_time": dt,
+                                                 "buy_price": price,
+                                                 "buy_share": buy_dict.get("buy_share"),
+                                                 "buy_money": buy_dict.get("buy_money"),
+                                                 "buy_money_cumsum": buy_dict.get("buy_money_cumsum"),
+                                                 "buy_next": buy_dict.get("buy_next"),
+                                                 "sell": buy_dict.get("sell")}
+        buy_list = [round_dict, {}]
+        return buy_list
 
-    def sell(self, price, records):
-        round_list = []
-        return round_list
-
-    # def _get_buy_interval(self):
-    #     # 获取每次买的间隔，由历史数据确定，应该分为几档
-    #     # 用昨天的数据确定买的间隔
-    #     return 0.05
-
-    # def _get_buy_baseshare(self):
-    #     # 获取买入的基准份额
-    #     # 由本金和历史数据确定
-    #     return 1E4
-
-    # def get_buy_info(self):
-    #     threshold = 0  # curr_threshold - self._get_buy_interval
-    #     share = 0  # curr_share * 2, self._get_buy_baseshare
-    #     return (threshold, share)
-
-
-class Record:
-    def __init__(self,
-                 rounds,
-                 latest_round,
-                 buy_time,
-                 buy_price,
-                 buy_share,
-                 buy_money,
-                 buy_money_cumsum,
-                 buy_next,
-                 sell,
-                 sell_time,
-                 sell_price,
-                 sell_share,
-                 finish,
-                 profit_share,
-                 profit) -> None:
-        self.rounds = rounds
-        self.latest_round = latest_round
-        self.buy_time = buy_time
-        self.buy_price = buy_price
-        self.buy_share = buy_share
-        self.buy_money = buy_money
-        self.buy_money_cumsum = buy_money_cumsum
-        self.buy_next = buy_next
-        self.sell = sell
-        self.sell_time = sell_time
-        self.sell_price = sell_price
-        self.sell_share = sell_share
-        self.finish = finish
-        self.profit_share = profit_share
-        self.profit = profit
-
-    @classmethod
-    def obj_hook(cls, obj_dict):
-        return cls(obj_dict.get("rounds"),
-                   obj_dict.get("latest_round"),
-                   obj_dict.get("buy_time"),
-                   obj_dict.get("buy_price"),
-                   obj_dict.get("buy_share"),
-                   obj_dict.get("buy_money"),
-                   obj_dict.get("buy_money_cumsum"),
-                   obj_dict.get("buy_next"),
-                   obj_dict.get("sell"),
-                   obj_dict.get("sell_time"),
-                   obj_dict.get("sell_price"),
-                   obj_dict.get("sell_share"),
-                   obj_dict.get("finish"),
-                   obj_dict.get("profit_share"),
-                   obj_dict.get("profit"))
-
-
-class Stock:
-    """股票类
-
-    code: 代码
-    profit: 盈利额，=每次交易差额+(盈利份额*卖出价-手续费)
-    profit_share: 盈利份额
-    sell_share_price: 卖出份额价格
-    records: 买/卖的记录，当某次成功卖出后，则删除此记录；sell的长度由当前交易价格确定，价格越低长度越长
-    position: 持仓份额
-    available: 可用份额，后一天可用份额=持仓份额
-    """
-
-    def __init__(self,
-                 code,
-                 records) -> None:
-        self.code = code
-        self.records = records
-        self.position = None
-        self.available = None
-        self.strategy = None
-
-    @ classmethod
-    def obj_hook(cls, obj_dict):
-        return cls(obj_dict.get("code"),
-                   [Record.obj_hook(r) for r in obj_dict.get("records")])
-
-    def init_data(self, df, stock_num):
-        position = 0
-        max_record_round = 0
-        for record in self.records:
-            if record.finish == 1:
-                position += record.profit_share
-            else:
-                position += record.buy_share
-            max_record_round = max(max_record_round, record.rounds)
-        self.max_record_round = max_record_round
-        self.position = position
-        self.available = self.position
-        self.strategy = Strategy(df, stock_num)
-
-    def update_position(self):
-        ...
-
-    def update_available(self):
-        self.available = self.position
-
-    def buy(self, principal, dt, price):
-        buy_dict = self.strategy.buy(principal, price, self.records)
-        buy_dict.get("exist_list")
-        fresh_dict = buy_dict.get("fresh_dict")
         # 没有记录也买
         for record in self.records:
             if record.finish == 0:
@@ -304,51 +190,182 @@ class Stock:
                 df_record.loc[condition, ["buy_next", "sell"]] = ""
                 # df_record = pd.concat([df_record, df_current], axis=0)
 
+        return share_list
+
+    def sell(self, price, records):
+        sell_dict = {"round_exist":[{},{}],"round_fresh":{}}
+        return sell_dict
+
+        # def _get_buy_interval(self):
+        #     # 获取每次买的间隔，由历史数据确定，应该分为几档
+        #     # 用昨天的数据确定买的间隔
+        #     return 0.05
+
+        # def _get_buy_baseshare(self):
+        #     # 获取买入的基准份额
+        #     # 由本金和历史数据确定
+        #     return 1E4
+
+        # def get_buy_info(self):
+        #     threshold = 0  # curr_threshold - self._get_buy_interval
+        #     share = 0  # curr_share * 2, self._get_buy_baseshare
+        #     return (threshold, share)
+
+
+class Record:
+    def __init__(self,
+                 rounds: int,
+                 latest_round: int,
+                 buy_time: str,
+                 buy_price: float,
+                 buy_share: int,
+                 buy_money: float,
+                 buy_money_cumsum: float,
+                 buy_next: str,
+                 sell: str,
+                 sell_time: str,
+                 sell_price: float,
+                 sell_share: int,
+                 finish: int,
+                 profit_share: int,
+                 profit: float) -> None:
+        self.rounds = rounds
+        self.latest_round = latest_round
+        self.buy_time = buy_time
+        self.buy_price = buy_price
+        self.buy_share = buy_share
+        self.buy_money = buy_money
+        self.buy_money_cumsum = buy_money_cumsum
+        self.buy_next = buy_next
+        self.sell = sell
+        self.sell_time = sell_time
+        self.sell_price = sell_price
+        self.sell_share = sell_share
+        self.finish = finish
+        self.profit_share = profit_share
+        self.profit = profit
+
+    @classmethod
+    def obj_hook(cls, obj_dict):
+        return cls(obj_dict.get("rounds"),
+                   obj_dict.get("latest_round", 1),
+                   obj_dict.get("buy_time", ""),
+                   obj_dict.get("buy_price", 0),
+                   obj_dict.get("buy_share", 0),
+                   obj_dict.get("buy_money", 0),
+                   obj_dict.get("buy_money_cumsum", 0),
+                   obj_dict.get("buy_next", ""),
+                   obj_dict.get("sell", ""),
+                   obj_dict.get("sell_time", ""),
+                   obj_dict.get("sell_price", 0),
+                   obj_dict.get("sell_share", 0),
+                   obj_dict.get("finish", 0),
+                   obj_dict.get("profit_share", 0),
+                   obj_dict.get("profit", 0))
+
+
+class Stock:
+    """股票类
+
+    code: 代码
+    records: 买/卖的记录
+    position: 持仓份额
+    available: 可用份额
+    strategy: 策略
+    """
+
+    def __init__(self,
+                 code,
+                 records) -> None:
+        self.code = code
+        self.records = records
+        self.position = None
+        self.available = None
+        self.strategy = None
+
+    @ classmethod
+    def obj_hook(cls, obj_dict):
+        return cls(obj_dict.get("code"),
+                   [Record.obj_hook(r) for r in obj_dict.get("records")])
+
+    def init_data(self, df, stock_num):
+        position = 0
+        for record in self.records:
+            if record.finish == 1:
+                position += record.profit_share
+            else:
+                position += record.buy_share
+        self.position = position
+        self.available = self.position
+        self.strategy = Strategy(df, stock_num)
+
+    def _update_position_available(self,
+                                   position: int = 0,
+                                   available: int = 0):
+        # 买入：参数值为正，卖出：参数值为负
+        self.position += position
+        self.available += available
+
+    def update_available(self):
+        self.available = self.position
+
+    def buy(self, principal, dt, price):
+        buy_list = self.strategy.buy(principal, price, self.records)
+        # 对存在的轮次纪录进行更新
+        for buy_dict in buy_list:
+            for record in self.records:
+                if record.rounds == buy_dict.get("rounds", -1):
+                    record.latest_round = 0
+                    record.buy_next = ""
+                    record.sell = ""
+        # 添加轮次纪录
+        use_principal = 0
+        for buy_dict in buy_list:
+            self._update_position_available(position=buy_dict.get("buy_share"))
+            use_principal += eval(buy_dict.get("buy_money"))
+            self.records.append(Record.obj_hook({"rounds": buy_dict.get("rounds", -1),
+                                                 "buy_time": dt,
+                                                 "buy_price": price,
+                                                 "buy_share": buy_dict.get("buy_share"),
+                                                 "buy_money": buy_dict.get("buy_money"),
+                                                 "buy_money_cumsum": buy_dict.get("buy_money_cumsum"),
+                                                 "buy_next": buy_dict.get("buy_next"),
+                                                 "sell": buy_dict.get("sell")}))
+        return use_principal
+
     def sell(self,
              dt: str,
              price: float) -> float:
         back_principal = 0
         sell_dict = self.strategy.sell(price, self.records)
         # 存在的
-        for exist_ in sell_dict.get("exist_list"):
+        for exist_ in sell_dict.get("round_exist"):
             for record in self.records:
                 if record.rounds == exist_.get("rounds", -1):
                     record.buy_next = ""
                     record.sell = ""
-                    # record.sell_time = ""
-                    # record.sell_price = ""
-                    # record.sell_share = ""
                     record.finish = 1
-                    # record.profit_share = 0
-                    # record.profit = 0
                     if record.latest_round == 1:
                         record.sell_time = dt
                         record.sell_price = price
                         record.sell_share = exist_.get("sell_share", 0)
                         record.profit_share = exist_.get("profit_share", 0)
                         record.profit = exist_.get("profit", 0)
+                        self._update_position_available(-exist_.get("sell_share"), -exist_.get("sell_share"))
                         back_principal += record.buy_money_cumsum
         # 新鲜的
-        fresh_dict = sell_dict.get("fresh_dict")
+        fresh_dict = sell_dict.get("round_fresh")
         if fresh_dict:
             for record in self.records:
                 record.profit_share = 0
-            self.records.append(
-                Record.obj_hook({"rounds": fresh_dict.get("rounds"),
-                                 "latest_round": 1,
-                                 "buy_time": "",
-                                 "buy_price": "",
-                                 "buy_share": "",
-                                 "buy_money": "",
-                                 "buy_money_cumsum": "",
-                                 "buy_next": "",
-                                 "sell": "",
-                                 "sell_time": dt,
-                                 "sell_price": price,
-                                 "sell_share": fresh_dict.get("sell_share"),
-                                 "finish": 1,
-                                 "profit_share": 0,
-                                 "profit": fresh_dict.get("profit")}))
+            self.records.append(Record.obj_hook({"rounds": fresh_dict.get("rounds", -1),
+                                                 "sell_time": dt,
+                                                 "sell_price": price,
+                                                 "sell_share": fresh_dict.get("sell_share"),
+                                                 "finish": 1,
+                                                 "profit_share": 0,
+                                                 "profit": fresh_dict.get("profit")}))
+            self._update_position_available(-fresh_dict.get("sell_share"), -fresh_dict.get("sell_share"))
             back_principal += fresh_dict.get("profit")
         return back_principal
 
@@ -639,12 +656,9 @@ class TestMain:
                 price = df["high"].values[0]
                 principal += stock.sell(date_str, price)
 
-                # stock.update_position()  # 此处都需要减去
-
                 hour = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S").hour
                 if hour == 15:
                     stock.update_available()
-        # self._update_record()
 
         # 更新record
         # Corpus("excel", self.record_file_path).save_data(record_dict)
