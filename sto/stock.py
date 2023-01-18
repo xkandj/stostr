@@ -137,21 +137,36 @@ class Strategy:
         self.stock_num = stock_num
 
     def buy(self, principal, price, records):
-        round_dict={"rounds": buy_dict.get("rounds", -1),
-                                                 "buy_time": dt,
-                                                 "buy_price": price,
-                                                 "buy_share": buy_dict.get("buy_share"),
-                                                 "buy_money": buy_dict.get("buy_money"),
-                                                 "buy_money_cumsum": buy_dict.get("buy_money_cumsum"),
-                                                 "buy_next": buy_dict.get("buy_next"),
-                                                 "sell": buy_dict.get("sell")}
+        # remain_principal = principal
+        lst = []
+        for record in records:
+            if record.finish == 0:
+                lst.append(record.rounds)
+                principal -= eval(record.buy_money)
+        length = len(set(lst))  # 次数超过多少不再买？
+        # 不买
+        if principal < x:
+            return []
+
+        # 买
+        while True:
+            ...
+        buy_shares = (self.total_shares / self.buy_shares_coeff + 1) * self.buy_shares_coeff
+        curr_volume = buy_shares * price
+        total_volume = self.total_consume + curr_volume + self._compute_commission(curr_volume)
+        if self.buy_threshold >= price and self.principal >= total_volume:
+            self.total_consume = total_volume
+            self.total_shares += buy_shares
+            self._compute_buy_thre(is_buy=True)
+
+        round_dict = {"rounds": rounds,
+                      "buy_share": buy_share,
+                      "buy_money": buy_money,
+                      "buy_money_cumsum": buy_money_cumsum,
+                      "buy_next": buy_next,
+                      "sell": sell}
         buy_list = [round_dict, {}]
         return buy_list
-
-        # 没有记录也买
-        for record in self.records:
-            if record.finish == 0:
-                consume += eval(record.buy_money)
 
         buy_shares = (self.total_shares / self.buy_shares_coeff + 1) * self.buy_shares_coeff
         curr_volume = buy_shares * price
@@ -169,22 +184,6 @@ class Strategy:
         return use_principal
 
         if trade_type == "buy":
-            # df_current = pd.DataFrame({
-            #     "round=round"),
-            #     "buy_time=buy_time"),
-            #     "buy_price=buy_price"),
-            #     "buy_share=buy_share"),
-            #     "buy_money=buy_money"),
-            #     "buy_money_cumsum=buy_money_cumsum"),
-            #     "buy_next=buy_next"),
-            #     "sell=sell"),
-            #     "sell_time": "",
-            #     "sell_price": "",
-            #     "sell_share": "",
-            #     "finish": 0,
-            #     "profit_share": 0,
-            #     "profit": 0
-            # })
             if df_record.empty == False:
                 condition = df_record["round"] == v.get("round")
                 df_record.loc[condition, ["buy_next", "sell"]] = ""
@@ -193,7 +192,7 @@ class Strategy:
         return share_list
 
     def sell(self, price, records):
-        sell_dict = {"round_exist":[{},{}],"round_fresh":{}}
+        sell_dict = {"round_exist": [{}, {}], "round_fresh": {}}
         return sell_dict
 
         # def _get_buy_interval(self):
@@ -210,6 +209,88 @@ class Strategy:
         #     threshold = 0  # curr_threshold - self._get_buy_interval
         #     share = 0  # curr_share * 2, self._get_buy_baseshare
         #     return (threshold, share)
+
+    def _init_buy_thre(self, price):
+        """根据历史数据初始化阈值，每过一天，重新计算阈值"""
+        # 第1版用第1天的数据, 阈值是根据当前价格，再高也得买
+        self.buy_threshold = price
+
+    def _compute_buy_thre(self, price=None, is_buy=False):
+        #
+        if self.total_shares == 0:
+            self.buy_threshold = price
+        elif is_buy:
+            self.buy_threshold -= self.buy_space
+
+    def _compute_sell_price(self):
+        """计算卖出的单价"""
+        if self.total_shares > 0:
+            sell_shares = self.total_shares - self.once_profit_shares * (self.total_shares/self.buy_shares_coeff)
+            return round(self.total_consume/sell_shares, 3)
+        return 0
+
+    def _compute_sell_thre(self):
+        """根据历史数据获取阈值，考虑已盈利份额及佣金"""
+        # 全部卖，卖的是多出的份额，一年只卖几次
+        ...
+        self.sell_threshold = 1.1
+        # self.profit_share += self.once_profit_shares * (self.total_shares/self.buy_shares_coeff)
+
+    def _compute_commission(self, curr_volume):
+        """佣金，（买/卖）交易额的万5，最低5元"""
+        min_commission = 5
+        commission = curr_volume * 3E-4
+
+        return max(min_commission, commission)
+
+    def _sell(self, buy_shares, sell_price, stock_price):
+        """全部"""
+        sell_shares = self.total_shares - buy_shares
+        if sell_shares > 0 and sell_price <= stock_price:
+            curr_volume = sell_shares * stock_price
+            total_volume = curr_volume - self._compute_commission(curr_volume)
+            self.profit_share += self.once_profit_shares * (sell_shares / self.buy_shares_coeff)
+            self.profit += total_volume - self.total_consume
+            self.total_consume = 0
+            self.total_shares -= sell_shares
+
+            print(f"sell...")
+            print(
+                f"profit_share, {self.profit_share}, profit, {self.profit}, total_consume, {self.total_consume}，total_shares, {self.total_shares}")
+
+        if self.sell_threshold <= stock_price:
+            # 当股票价格超过阈值
+            if self.profit_share > 0:
+                curr_volume = self.profit_share * stock_price
+                self.profit += curr_volume - self._compute_commission(curr_volume)
+                self.profit_share = 0
+
+    def validate(self, df):
+        """策略1"""
+        # self._init_buy_thre(df.loc[df.index[0], "open"])
+        self._compute_sell_thre()
+        # 理论上每天可以进行多次买卖，但是当天买的份额要隔天卖
+        # 先卖再买，故每天最多进行一次卖操作
+        day_buy_shares = 0
+        dt = datetime.datetime.strptime(df.index[0], "%Y-%m-%d %H:%M:%S")
+        for date_str in df.index:
+            dt_ = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            if (dt_ - dt).days != 0:
+                dt = dt_
+                day_buy_shares = 0
+
+            print(f"date_str, {date_str}")
+            sell_price = self._compute_sell_price()
+            print(f"sell_price, {sell_price}")
+            high_price = df.loc[date_str, "high"]
+            print(f"high_price, {high_price}")
+            self._sell(day_buy_shares, sell_price, high_price)
+
+            self._compute_buy_thre(df.loc[date_str, "open"])
+            low_price = df.loc[date_str, "low"]
+            print(f"low_price, {low_price}")
+            day_buy_shares += self._buy(low_price)
+            print(f"day_buy_shares, {day_buy_shares}")
 
 
 class Record:
@@ -507,119 +588,6 @@ class TestMain:
     def _load_data(file_type: str,
                    file_path: str):
         return Corpus(file_type, file_path).load_data()
-
-    def _load_stock_info(self):
-        if path.isfile(self.info_filepath):
-            with open(self.info_filepath, "r") as f:
-                json_data = f.readlines()
-            return json_data
-        return None
-
-    def _save_stock_info(self, json_data):
-        with open(self.info_filepath, "w") as f:
-            f.write(json_data)
-
-    def _preprocess(self):
-        self._init_stock()
-        ...
-
-    def _init_buy_thre(self, price):
-        """根据历史数据初始化阈值，每过一天，重新计算阈值"""
-        # 第1版用第1天的数据, 阈值是根据当前价格，再高也得买
-        self.buy_threshold = price
-
-    def _compute_buy_thre(self, price=None, is_buy=False):
-        #
-        if self.total_shares == 0:
-            self.buy_threshold = price
-        elif is_buy:
-            self.buy_threshold -= self.buy_space
-
-    def _compute_sell_price(self):
-        """计算卖出的单价"""
-        if self.total_shares > 0:
-            sell_shares = self.total_shares - self.once_profit_shares * (self.total_shares/self.buy_shares_coeff)
-            return round(self.total_consume/sell_shares, 3)
-        return 0
-
-    def _compute_sell_thre(self):
-        """根据历史数据获取阈值，考虑已盈利份额及佣金"""
-        # 全部卖，卖的是多出的份额，一年只卖几次
-        ...
-        self.sell_threshold = 1.1
-        # self.profit_share += self.once_profit_shares * (self.total_shares/self.buy_shares_coeff)
-
-    def _compute_commission(self, curr_volume):
-        """佣金，（买/卖）交易额的万5，最低5元"""
-        min_commission = 5
-        commission = curr_volume * 5E-4
-
-        return max(min_commission, commission)
-
-    def _buy(self, price):
-        buy_shares = (self.total_shares / self.buy_shares_coeff + 1) * self.buy_shares_coeff
-        curr_volume = buy_shares * price
-        total_volume = self.total_consume + curr_volume + self._compute_commission(curr_volume)
-        if self.buy_threshold >= price and self.principal >= total_volume:
-            self.total_consume = total_volume
-            self.total_shares += buy_shares
-            self._compute_buy_thre(is_buy=True)
-
-            print(f"buy...")
-            print(
-                f"buy_threshold, {self.buy_threshold}, price, {price}, total_consume, {self.total_consume}，total_shares, {self.total_shares}")
-
-            return buy_shares
-        return 0
-
-    def _sell(self, buy_shares, sell_price, stock_price):
-        """全部"""
-        sell_shares = self.total_shares - buy_shares
-        if sell_shares > 0 and sell_price <= stock_price:
-            curr_volume = sell_shares * stock_price
-            total_volume = curr_volume - self._compute_commission(curr_volume)
-            self.profit_share += self.once_profit_shares * (sell_shares / self.buy_shares_coeff)
-            self.profit += total_volume - self.total_consume
-            self.total_consume = 0
-            self.total_shares -= sell_shares
-
-            print(f"sell...")
-            print(
-                f"profit_share, {self.profit_share}, profit, {self.profit}, total_consume, {self.total_consume}，total_shares, {self.total_shares}")
-
-        if self.sell_threshold <= stock_price:
-            # 当股票价格超过阈值
-            if self.profit_share > 0:
-                curr_volume = self.profit_share * stock_price
-                self.profit += curr_volume - self._compute_commission(curr_volume)
-                self.profit_share = 0
-
-    def validate(self, df):
-        """策略1"""
-        # self._init_buy_thre(df.loc[df.index[0], "open"])
-        self._compute_sell_thre()
-        # 理论上每天可以进行多次买卖，但是当天买的份额要隔天卖
-        # 先卖再买，故每天最多进行一次卖操作
-        day_buy_shares = 0
-        dt = datetime.datetime.strptime(df.index[0], "%Y-%m-%d %H:%M:%S")
-        for date_str in df.index:
-            dt_ = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-            if (dt_ - dt).days != 0:
-                dt = dt_
-                day_buy_shares = 0
-
-            print(f"date_str, {date_str}")
-            sell_price = self._compute_sell_price()
-            print(f"sell_price, {sell_price}")
-            high_price = df.loc[date_str, "high"]
-            print(f"high_price, {high_price}")
-            self._sell(day_buy_shares, sell_price, high_price)
-
-            self._compute_buy_thre(df.loc[date_str, "open"])
-            low_price = df.loc[date_str, "low"]
-            print(f"low_price, {low_price}")
-            day_buy_shares += self._buy(low_price)
-            print(f"day_buy_shares, {day_buy_shares}")
 
     def test(self,
              principal: float,
