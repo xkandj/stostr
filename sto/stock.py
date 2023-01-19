@@ -1,5 +1,6 @@
 
 
+import copy
 import datetime
 from os import path
 from typing import Any, Dict, List, Optional, Union
@@ -136,8 +137,9 @@ class Strategy:
         self.df = df
         self.stock_num = stock_num
 
-    def buy(self, principal, price, records):
+    def buy(self, principal, price, records_):
         remain_principal = principal
+        records = copy.deepcopy(records_)
         exec_round_list = []
         for record in records:
             if record.finish == 0:
@@ -145,12 +147,25 @@ class Strategy:
                 remain_principal -= eval(record.buy_money)
         length = len(set(exec_round_list))  # 次数超过多少不再买？
         # 不买
-        if remain_principal < 0 or remain_principal < 0.3*principal or len(set(exec_round_list)) > 5:
-            return []
+        # if remain_principal < 0 or remain_principal < 0.3*principal or len(set(exec_round_list)) > 5:
+        #     return []
 
         # 买
+        ret_buy_list = []
+        # ret_buy_list = [round_dict, {}]
         while True:
-            ...
+            if remain_principal < 0:
+                break
+            for record in records:
+                ...
+            if len(records) == 0:
+                records.append(Record.obj_hook({"rounds": 1,
+                                                "buy_share": buy_dict.get("buy_share"),
+                                                "buy_money": buy_dict.get("buy_money"),
+                                                "buy_money_cumsum": buy_dict.get("buy_money_cumsum"),
+                                                "buy_next": buy_dict.get("buy_next"),
+                                                "sell": buy_dict.get("sell")}))
+
         buy_shares = (self.total_shares / self.buy_shares_coeff + 1) * self.buy_shares_coeff
         curr_volume = buy_shares * price
         total_volume = self.total_consume + curr_volume + self._compute_commission(curr_volume)
@@ -165,8 +180,8 @@ class Strategy:
                       "buy_money_cumsum": buy_money_cumsum,
                       "buy_next": buy_next,
                       "sell": sell}
-        buy_list = [round_dict, {}]
-        return buy_list
+        ret_buy_list = [round_dict, {}]
+        return ret_buy_list
 
         buy_shares = (self.total_shares / self.buy_shares_coeff + 1) * self.buy_shares_coeff
         curr_volume = buy_shares * price
@@ -634,3 +649,5 @@ class TestMain:
 
 if __name__ == "__main__":
     TestMain().test(principal=10000*10, start_date="2022-01-02")
+    # 卖出：委托时，持仓47.7可用10.4, 成交后都变成10.4
+    # 买入：委托，成交
